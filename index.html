@@ -196,7 +196,7 @@ body {
 }
 #mute-toggle { right: 12px; }
 #info-toggle { right: 58px; font-size: 0.85rem; font-weight: 700; font-style: italic; }
-#legal-modal {
+#legal-modal, #ship-dex-modal {
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -206,8 +206,8 @@ body {
   padding: 16px;
   overflow-y: auto;
 }
-#legal-modal.open { display: flex; align-items: flex-start; justify-content: center; }
-#legal-modal .legal-card {
+#legal-modal.open, #ship-dex-modal.open { display: flex; align-items: flex-start; justify-content: center; }
+#legal-modal .legal-card, #ship-dex-modal .legal-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -217,27 +217,27 @@ body {
   margin: 24px auto;
   box-shadow: 0 0 40px rgba(34, 211, 238, 0.12), 0 10px 40px rgba(0,0,0,0.5);
 }
-#legal-modal h2 {
+#legal-modal h2, #ship-dex-modal h2 {
   margin: 0 0 4px;
   font-size: 1.15rem;
   color: #fff;
   text-shadow: 0 0 8px var(--accent);
 }
-#legal-modal h3 {
+#legal-modal h3, #ship-dex-modal h3 {
   font-size: 0.82rem;
   color: var(--neon);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin: 16px 0 4px;
 }
-#legal-modal p {
+#legal-modal p, #ship-dex-modal p {
   font-size: 0.85rem;
   line-height: 1.7;
   color: var(--text);
   margin: 0 0 6px;
 }
-#legal-modal a { color: var(--accent); }
-#legal-modal .legal-close {
+#legal-modal a, #ship-dex-modal a { color: var(--accent); }
+#legal-modal .legal-close, #ship-dex-modal .legal-close {
   margin-top: 18px;
   width: 100%;
 }
@@ -469,6 +469,21 @@ button.btn.danger {
 }
 .result-line.ok { color: var(--good); }
 .result-line.ng { color: var(--bad); }
+.choice-main { display: block; }
+.choice-caption {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--muted);
+  animation: explainPop 0.25s ease-out;
+}
+.choice.correct .choice-caption { color: var(--good); }
+.choice.wrong .choice-caption { color: var(--bad); }
+@keyframes explainPop {
+  0% { opacity: 0; transform: translateY(-3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 .missed-item {
   border-bottom: 1px solid var(--border);
   padding: 10px 0;
@@ -488,6 +503,13 @@ button.btn.danger {
 .pager button { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text); cursor: pointer; }
 .pager button:disabled { opacity: 0.4; cursor: default; }
 .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 0.9rem; }
+.home-footer-stats {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 14px;
+  letter-spacing: 0.02em;
+}
 
 /* analytics */
 .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.82rem; }
@@ -510,6 +532,29 @@ button.btn.danger {
 }
 .xp-bar { height: 8px; background: var(--chip-bg); border-radius: 4px; overflow: hidden; margin-top: 4px; }
 .xp-bar > div { height: 100%; background: var(--gold); }
+.ship-card-tap { cursor: pointer; }
+.ship-card-tap:active { transform: scale(0.985); }
+.dex-hint { font-size: 0.68rem; color: var(--accent); font-weight: 600; }
+
+#ship-dex-modal .legal-card { max-width: 480px; }
+.dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.dex-cell {
+  background: var(--chip-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 4px;
+  text-align: center;
+}
+.dex-cell.locked { opacity: 0.4; }
+.dex-cell.current { border-color: var(--gold); box-shadow: 0 0 12px rgba(251,191,36,0.35); }
+.dex-cell canvas { width: 100%; height: auto; display: block; }
+.dex-cell .dex-label { font-size: 0.72rem; font-weight: 700; margin-top: 4px; }
+.dex-cell .dex-req { font-size: 0.62rem; color: var(--muted); }
 
 /* shooting game */
 .game-wrap { position: relative; width: 100%; max-width: 640px; margin: 0 auto; }
@@ -522,17 +567,20 @@ button.btn.danger {
   background: radial-gradient(ellipse at 50% 0%, #1b2340, #05070f 75%);
   touch-action: manipulation;
 }
-.game-hud-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; gap: 4px; }
+.game-hud-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; flex-wrap: wrap; gap: 4px; }
 .game-hud-top .lives { letter-spacing: 2px; }
-.game-timer { height: 6px; background: var(--chip-bg); border-radius: 3px; overflow: hidden; margin: 6px 0 10px; }
+.game-timer { height: 5px; background: var(--chip-bg); border-radius: 3px; overflow: hidden; margin: 4px 0 6px; }
 .game-timer > div { height: 100%; background: var(--bad); }
-.game-prompt { text-align: center; font-weight: 700; font-size: 1.05rem; margin: 10px 0 12px; min-height: 1.6em; }
-.legend { margin-top: 10px; }
+.game-prompt { text-align: center; font-weight: 700; font-size: 0.98rem; margin: 6px 0 8px; min-height: 1.4em; }
+.legend { margin-top: 6px; }
+.legend .choice { padding: 8px 10px; margin-bottom: 6px; font-size: 0.82rem; line-height: 1.35; }
+.legend .choice-caption { font-size: 0.72rem; margin-top: 2px; }
 .legend .choice { display: flex; gap: 8px; align-items: flex-start; }
 .legend .choice .col-badge {
   flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; background: var(--chip-bg);
   display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;
 }
+.legend .choice .choice-body { flex: 1; min-width: 0; }
 
 @media (max-width: 480px) {
   #app { padding: 10px; padding-bottom: 50px; }
@@ -579,6 +627,15 @@ button.btn.danger {
   </div>
 </div>
 
+<div id="ship-dex-modal">
+  <div class="legal-card">
+    <h2>機体進化図鑑</h2>
+    <p style="margin-bottom:0;">正解を重ねてXPを貯めるとレベルが上がり、機体が最大Tier10まで進化します。</p>
+    <div class="dex-grid" id="dex-grid"></div>
+    <button class="btn legal-close" id="dex-close-btn">閉じる</button>
+  </div>
+</div>
+
 <!--
   広告プレースホルダー（左右レール・下部バナー）
   実際に広告を配信するには、Google AdSense などの広告ネットワークにご自身で登録し、
@@ -617,7 +674,9 @@ function saveShip() { localStorage.setItem(SHIP_KEY, JSON.stringify(ship)); }
 let ship = loadShip();
 
 function xpForLevel(level) { return 50 + (level - 1) * 25; }
-function tierForLevel(level) { return Math.min(level, 10); }
+const LEVELS_PER_TIER = 5;
+function tierForLevel(level) { return Math.min(Math.ceil(level / LEVELS_PER_TIER), 10); }
+function levelForTier(tier) { return (tier - 1) * LEVELS_PER_TIER + 1; }
 
 /* ---------- sound effects (synthesized, no external assets) ---------- */
 const SFX_KEY = 'ap_tango_sfx_v1';
@@ -706,6 +765,56 @@ function initLegalModal() {
   if (!modal || !openBtn) return;
   openBtn.addEventListener('click', () => { modal.classList.add('open'); });
   if (closeBtn) closeBtn.addEventListener('click', () => { modal.classList.remove('open'); });
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+}
+
+function renderShipDexGrid() {
+  const grid = document.getElementById('dex-grid');
+  if (!grid) return;
+  const currentTier = tierForLevel(ship.level);
+  let html = '';
+  for (let tier = 1; tier <= 10; tier++) {
+    const locked = tier > currentTier;
+    const isCurrent = tier === currentTier;
+    html += `<div class="dex-cell ${locked ? 'locked' : ''} ${isCurrent ? 'current' : ''}">
+      <canvas data-tier="${tier}" width="120" height="120"></canvas>
+      <div class="dex-label">Tier ${tier}</div>
+      <div class="dex-req">${locked ? ('Lv.' + levelForTier(tier) + 'で解放') : (isCurrent ? '現在の機体' : '解放済み')}</div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('canvas').forEach(cv => {
+    const tier = parseInt(cv.dataset.tier, 10);
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, 120, 120);
+    if (tier > currentTier) {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      drawShip(ctx, 60, 66, tier);
+      ctx.restore();
+      ctx.fillStyle = '#93a0b8';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🔒', 60, 66);
+    } else {
+      drawShip(ctx, 60, 66, tier);
+    }
+  });
+}
+
+function initShipDex() {
+  const modal = document.getElementById('ship-dex-modal');
+  const closeBtn = document.getElementById('dex-close-btn');
+  if (!modal) return;
+  document.addEventListener('click', e => {
+    if (e.target.closest('#ship-dex-open')) {
+      sfxClick();
+      renderShipDexGrid();
+      modal.classList.add('open');
+    }
+  });
+  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.remove('open'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 }
 
@@ -917,8 +1026,18 @@ function overallStats() {
   });
   const attempts = correct + incorrect;
   const acc = attempts ? Math.round((correct / attempts) * 100) : 0;
-  return { studied, correct, incorrect, acc, total: TERMS.length };
+  return { studied, correct, incorrect, acc, attempts, total: TERMS.length };
 }
+
+// Per-browser local counters (no server, so this reflects this device only,
+// not a global visitor count).
+const VISIT_KEY = 'ap_tango_visits_v1';
+function bumpVisitCount() {
+  let v = parseInt(localStorage.getItem(VISIT_KEY) || '0', 10) + 1;
+  localStorage.setItem(VISIT_KEY, String(v));
+  return v;
+}
+const visitCount = bumpVisitCount();
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -973,10 +1092,10 @@ function shipCard() {
   const tier = tierForLevel(ship.level);
   const need = xpForLevel(ship.level);
   const pct = Math.round((ship.xp / need) * 100);
-  return `<div class="card ship-card">
+  return `<div class="card ship-card ship-card-tap" id="ship-dex-open">
     <div class="ship-tier-badge">T${tier}</div>
     <div style="flex:1;">
-      <div style="font-size:0.85rem;font-weight:600;">Lv.${ship.level} 機体</div>
+      <div style="font-size:0.85rem;font-weight:600;">Lv.${ship.level} 機体 <span class="dex-hint">図鑑を見る ›</span></div>
       <div class="xp-bar"><div style="width:${pct}%"></div></div>
       <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">XP ${ship.xp} / ${need}</div>
     </div>
@@ -1046,6 +1165,7 @@ function renderHome() {
     <div class="sub" style="margin-top:10px;">現在の範囲: ${poolCount}語が対象</div>
     <button class="btn" id="start-btn" style="margin-top:8px;" ${poolCount === 0 ? 'disabled' : ''}>${state.playMode === 'dopa' ? '⚡ DOPA出撃！' : state.playMode === 'shooting' ? '🚀 出撃する！' : 'クイズを始める'}</button>
   </div>
+  <div class="home-footer-stats">この端末でのアクセス数 ${visitCount}回　|　解答数 ${stats.attempts}問</div>
   `;
 }
 
@@ -1175,7 +1295,11 @@ function renderQuiz() {
       if (ci === q.idx) cls += ' correct';
       else if (ci === q.selected) cls += ' wrong';
     }
-    choicesHtml += `<button class="${cls}" data-ci="${ci}" ${q.answered ? 'disabled' : ''}>${esc(choices[i])}</button>`;
+    const caption = q.answered ? choiceCaption(ci, q.dir) : '';
+    choicesHtml += `<button class="${cls}" data-ci="${ci}" ${q.answered ? 'disabled' : ''}>
+      <span class="choice-main">${esc(choices[i])}</span>
+      ${caption ? `<span class="choice-caption">${esc(caption)}</span>` : ''}
+    </button>`;
   });
 
   const emergency = isEmergency(quiz.correct, quiz.missed.length);
@@ -1195,6 +1319,19 @@ function renderQuiz() {
   </div>
   </div>
   `;
+}
+
+// After answering, each choice button gets a small caption showing whichever
+// half of {term, definition} its own label did NOT already show, so every
+// choice (right AND wrong) gets a brief explanation without adding a
+// separate card/section — keeps the whole thing on one screen.
+function truncate(s, n) {
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+function choiceCaption(idx, dir) {
+  const t = TERMS[idx];
+  if (dir === 'term2def') return t.t; // choice shows the definition -> caption shows the term
+  return truncate(t.d, 46); // choice shows the term -> caption shows a short definition
 }
 
 function renderResult() {
@@ -1638,7 +1775,7 @@ function renderShootingHUD() {
   const promptText = SG.wave.dir === 'term2def' ? termDisplay(SG.wave.idx) : term.d;
   const choices = SG.wave.choiceIdxs.map(ci => {
     const t = TERMS[ci];
-    return SG.wave.dir === 'term2def' ? t.d : termDisplay(ci);
+    return SG.wave.dir === 'term2def' ? truncate(t.d, 44) : termDisplay(ci);
   });
   promptEl.textContent = promptText;
   metaEl.textContent = `WAVE ${SG.waveIdx + 1}/${SG.waves.length}　${shortDai(cat.dai)}／${shortChu(cat.chu)}`;
@@ -1659,7 +1796,11 @@ function renderShootingHUD() {
       if (ci === SG.wave.idx) cls += ' correct';
       else if (i === SG.wave.hitColumn) cls += ' wrong';
     }
-    return `<button class="${cls}" data-col="${i}" ${SG.wave.resolved ? 'disabled' : ''}><span class="col-badge">${badges[i]}</span><span>${esc(choices[i])}</span></button>`;
+    const caption = SG.wave.resolved ? choiceCaption(ci, SG.wave.dir) : '';
+    return `<button class="${cls}" data-col="${i}" ${SG.wave.resolved ? 'disabled' : ''}>
+      <span class="col-badge">${badges[i]}</span>
+      <span class="choice-body"><span class="choice-main">${esc(choices[i])}</span>${caption ? `<span class="choice-caption">${esc(caption)}</span>` : ''}</span>
+    </button>`;
   }).join('');
 
   legendEl.querySelectorAll('.choice').forEach(el => {
@@ -1829,7 +1970,8 @@ function updateGame(dt) {
     SG.phaseTimer += dt;
     const timerFill = document.getElementById('sg-timer-fill');
     if (timerFill) timerFill.style.width = '100%';
-    if (SG.phaseTimer > 1.1) {
+    const resolvePause = SG.dopa ? 1.1 : 2.0;
+    if (SG.phaseTimer > resolvePause) {
       SG.waveIdx++;
       startWave();
     }
@@ -1991,6 +2133,7 @@ function renderShootingResult() {
 
 initMuteToggle();
 initLegalModal();
+initShipDex();
 render();
 </script>
 </body>
