@@ -27,6 +27,35 @@
 <meta name="twitter:description" content="応用情報技術者試験シラバスVer.7.2の用語4,747語を収録。アーケード風4択クイズ＆シューティングで暗記できる無料の学習アプリ。">
 <meta name="twitter:image" content="https://yooogeee16.github.io/og-image.png">
 
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "TERM INVADERS（応用情報 用語暗記アプリ）",
+  "alternateName": "応用情報 用語暗記アプリ",
+  "url": "https://yooogeee16.github.io/",
+  "description": "応用情報技術者試験シラバスVer.7.2の用語4,890語を収録した無料の学習アプリ。アーケード風の4択クイズとシューティングゲームで用語暗記ができます。",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "Any (Webブラウザ)",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "ja",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "JPY"
+  },
+  "about": {
+    "@type": "Thing",
+    "name": "応用情報技術者試験"
+  },
+  "audience": {
+    "@type": "Audience",
+    "audienceType": "応用情報技術者試験の受験者"
+  }
+}
+</script>
+
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2071457256389322"
      crossorigin="anonymous"></script>
 <style>
@@ -1104,6 +1133,26 @@ function shipCard() {
 
 function isShootingLike() { return state.playMode === 'shooting' || state.playMode === 'dopa'; }
 
+// A small, fixed set of well-known terms rendered as plain text on the home
+// screen (part of the synchronous initial render, not fetched later) so
+// search engines have real, specific, indexable content to match queries
+// like "RISC とは" against, instead of only an empty shell + JS bundle.
+const FEATURED_TERM_NAMES = ['RISC', 'CISC', 'TCP', 'HTML', 'ISMS', 'GDPR', 'CI', 'LLM', 'RAID', 'QR'];
+function renderFeaturedTerms() {
+  const rows = FEATURED_TERM_NAMES
+    .map(name => TERMS.findIndex(t => t.t === name))
+    .filter(i => i >= 0)
+    .map(i => `<div class="term-row"><div class="term-name">${esc(TERMS[i].t)}</div><div class="term-def">${esc(TERMS[i].d)}</div></div>`)
+    .join('');
+  if (!rows) return '';
+  return `
+  <div class="card">
+    <label class="field" style="margin-top:0;">収録用語の一例</label>
+    ${rows}
+    <div class="sub" style="margin:8px 0 0;">ほか ${TERMS.length}語を収録（<a href="#" data-tab="browse" style="color:var(--accent);">用語一覧で検索</a>）</div>
+  </div>`;
+}
+
 function renderHome() {
   const stats = overallStats();
   const poolCount = filteredIndices().length;
@@ -1165,6 +1214,7 @@ function renderHome() {
     <div class="sub" style="margin-top:10px;">現在の範囲: ${poolCount}語が対象</div>
     <button class="btn" id="start-btn" style="margin-top:8px;" ${poolCount === 0 ? 'disabled' : ''}>${state.playMode === 'dopa' ? '⚡ DOPA出撃！' : state.playMode === 'shooting' ? '🚀 出撃する！' : 'クイズを始める'}</button>
   </div>
+  ${renderFeaturedTerms()}
   <div class="home-footer-stats">この端末でのアクセス数 ${visitCount}回　|　解答数 ${stats.attempts}問</div>
   `;
 }
@@ -1414,7 +1464,7 @@ function renderBrowse() {
 /* ---------- event wiring for non-canvas views ---------- */
 function attachHandlers() {
   document.querySelectorAll('[data-tab]').forEach(el => {
-    el.addEventListener('click', () => { sfxClick(); state.view = el.dataset.tab; render(); });
+    el.addEventListener('click', e => { e.preventDefault(); sfxClick(); state.view = el.dataset.tab; render(); });
   });
 
   if (state.view === 'home') {
