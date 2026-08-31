@@ -717,6 +717,7 @@ button.btn.danger {
 .bar-track { flex: 1; height: 10px; background: var(--chip-bg); border-radius: 6px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--accent); }
 .bar-fill.acc { background: var(--good); }
+.bar-fill.weak { background: var(--bad); }
 .bar-row .bar-num { width: 78px; flex-shrink: 0; text-align: right; color: var(--muted); font-size: 0.75rem; }
 .grade-card { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .grade-donut { flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
@@ -1263,6 +1264,7 @@ let state = {
   direction: 'term2def',
   mode: 'random',
   settingsExpanded: false,
+  chuExpanded: false,
   quiz: null,
 };
 
@@ -1385,7 +1387,12 @@ function pickDistractors(correctIdx, pool, dir) {
 
 function recordAnswer(termIdx, isCorrect) {
   if (!progress[termIdx]) progress[termIdx] = { correct: 0, incorrect: 0 };
-  if (isCorrect) progress[termIdx].correct++; else progress[termIdx].incorrect++;
+  if (isCorrect) {
+    progress[termIdx].correct++;
+  } else {
+    progress[termIdx].incorrect++;
+    progress[termIdx].lastWrongAt = Date.now();
+  }
   progress[termIdx].lastSeen = Date.now();
   saveProgress(progress);
 }
@@ -1871,6 +1878,71 @@ function computeWeakTerms(limit) {
   return rows.slice(0, limit);
 }
 
+// Sorted by when each term was most recently missed (not just weakest
+// overall) -- lets a review session target "what did I just get wrong",
+// distinct from computeWeakTerms's all-time worst-accuracy ranking.
+function computeRecentMistakes(limit) {
+  const rows = [];
+  Object.keys(progress).forEach(k => {
+    const idx = parseInt(k, 10);
+    const p = progress[idx];
+    if (!p.lastWrongAt) return;
+    rows.push({ idx, lastWrongAt: p.lastWrongAt, incorrect: p.incorrect || 0 });
+  });
+  rows.sort((a, b) => b.lastWrongAt - a.lastWrongAt);
+  return rows.slice(0, limit);
+}
+function timeAgo(ts) {
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return 'たった今';
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}日前`;
+  return `${Math.floor(day / 30)}か月前`;
+}
+
+// The 大分類 with the worst accuracy (min 3 attempts, so one lucky/unlucky
+// guess in a barely-touched category doesn't dominate the ranking).
+function computeWeakCategories(limit) {
+  // >=3 attempts so one early guess doesn't brand a category "weak", and
+  // <75% accuracy so a merely-least-strong category among otherwise-strong
+  // ones doesn't get flagged as if it were a real problem area.
+  const rows = computeCategoryStats().filter(r => r.correct + r.incorrect >= 3 && r.acc !== null && r.acc < 75);
+  rows.sort((a, b) => a.acc - b.acc);
+  return rows.slice(0, limit);
+}
+
+// Same idea as computeCategoryStats but at 中分類 granularity, for a finer
+// breakdown than the 9 top-level 大分類 rows.
+function computeChuStats() {
+  const map = new Map();
+  const order = [];
+  for (let i = 0; i < TERMS.length; i++) {
+    const cat = CATS[TERMS[i].c];
+    const key = cat.dai + '｜' + cat.chu;
+    if (!map.has(key)) {
+      map.set(key, { dai: cat.dai, chu: cat.chu, total: 0, studied: 0, correct: 0, incorrect: 0 });
+      order.push(key);
+    }
+    const row = map.get(key);
+    row.total++;
+    const p = progress[i];
+    if (p) {
+      row.studied++;
+      row.correct += p.correct || 0;
+      row.incorrect += p.incorrect || 0;
+    }
+  }
+  return order.map(k => {
+    const r = map.get(k);
+    const attempts = r.correct + r.incorrect;
+    r.acc = attempts ? Math.round((r.correct / attempts) * 100) : null;
+    return r;
+  });
+}
+
 function masteredCount() {
   let n = 0;
   Object.values(progress).forEach(p => {
@@ -1882,6 +1954,9 @@ function masteredCount() {
 function renderAnalytics() {
   const stats = overallStats();
   const catRows = computeCategoryStats();
+  const chuRows = computeChuStats();
+  const weakCats = computeWeakCategories(5);
+  const recentMistakes = computeRecentMistakes(10);
   const weak = computeWeakTerms(15);
   const mastered = masteredCount();
 
@@ -1893,6 +1968,33 @@ function renderAnalytics() {
       <div class="bar-num">${r.studied}/${r.total}${r.acc !== null ? ` (${r.acc}%)` : ''}</div>
     </div>`;
   }).join('');
+
+  const chuHtml = chuRows.map(r => {
+    const covPct = r.total ? Math.round((r.studied / r.total) * 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label" title="${esc(shortDai(r.dai))}">${esc(shortChu(r.chu))}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${covPct}%"></div></div>
+      <div class="bar-num">${r.studied}/${r.total}${r.acc !== null ? ` (${r.acc}%)` : ''}</div>
+    </div>`;
+  }).join('');
+
+  const hasEnoughCatData = catRows.some(r => r.correct + r.incorrect >= 3);
+  const weakCatHtml = weakCats.length ? weakCats.map(r => {
+    return `<div class="bar-row">
+      <div class="bar-label">${esc(shortDai(r.dai))}</div>
+      <div class="bar-track"><div class="bar-fill weak" style="width:${r.acc}%"></div></div>
+      <div class="bar-num">${r.acc}%（${r.correct + r.incorrect}回）</div>
+    </div>`;
+  }).join('') : `<div class="empty">${hasEnoughCatData ? '👍 目立った苦手分類はありません' : '分類ごとの傾向を出すにはもう少し解答が必要です'}</div>`;
+
+  const recentHtml = recentMistakes.length ? recentMistakes.map(w => {
+    const t = TERMS[w.idx];
+    return `<div class="missed-item">
+      <div class="missed-term">${esc(t.t)}</div>
+      <div class="missed-def">${esc(t.d)}</div>
+      <div class="wt-acc" style="margin-top:2px;">${esc(timeAgo(w.lastWrongAt))}に間違い</div>
+    </div>`;
+  }).join('') : '<div class="empty">まだ間違えた記録がありません</div>';
 
   const weakHtml = weak.length ? weak.map(w => {
     const t = TERMS[w.idx];
@@ -1921,8 +2023,25 @@ function renderAnalytics() {
   </div>
 
   <div class="card">
+    <label class="field" style="margin-top:0;">苦手な分類（正答率が低い順・上位5件）</label>
+    ${weakCatHtml}
+  </div>
+
+  <div class="card">
     <label class="field" style="margin-top:0;">大分類別の学習状況</label>
     ${catHtml}
+    <button class="settings-toggle${state.chuExpanded ? ' expanded' : ''}" id="chu-toggle" type="button" style="margin-top:10px;" aria-expanded="${state.chuExpanded ? 'true' : 'false'}">
+      <span>中分類別の詳細を見る</span>
+      <span class="chev">▾</span>
+    </button>
+    <div class="settings-body" id="chu-body" style="${state.chuExpanded ? '' : 'display:none;'}">
+      ${chuHtml}
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="field" style="margin-top:0;">直近で間違えた用語</label>
+    ${recentHtml}
   </div>
 
   <div class="card">
@@ -2143,6 +2262,8 @@ function attachHandlers() {
       saveShip();
       render();
     });
+    const chuToggle = document.getElementById('chu-toggle');
+    if (chuToggle) chuToggle.addEventListener('click', () => { sfxClick(); state.chuExpanded = !state.chuExpanded; render(); });
   }
 
   if (state.view === 'quiz') {
