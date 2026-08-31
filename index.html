@@ -637,6 +637,20 @@ button.btn.danger {
 .term-name { font-weight: 700; margin-bottom: 2px; }
 .term-cat { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
 .term-def { font-size: 0.88rem; }
+.term-status {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.term-status.status-unseen { background: var(--chip-bg); color: var(--muted); }
+.term-status.status-correct { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+.term-status.status-wrong { background: rgba(248, 113, 113, 0.15); color: var(--bad); }
+.browse-summary { margin: 8px 0 0; }
 .featured-term-row { display: flex; gap: 10px; align-items: flex-start; }
 .featured-invader {
   flex-shrink: 0;
@@ -2154,8 +2168,43 @@ function renderResult() {
 }
 
 /* ---------- browse ---------- */
-let browseState = { q: '', dai: 'ALL', page: 0 };
+let browseState = { q: '', dai: 'ALL', chu: 'ALL', status: 'ALL', sort: 'default', page: 0, filtersExpanded: false };
 const PAGE_SIZE = 60;
+
+// The (dai, chu) pairs in CATS are already unique per combination (see
+// merge_and_build.py's cat_index), so filtering by the currently-selected
+// 大分類 and de-duping isn't needed -- just pull matching rows as-is.
+function chuOptionsForDai(dai) {
+  return CATS.filter(c => dai === 'ALL' || c.dai === dai);
+}
+
+function termStatus(idx) {
+  const p = progress[idx];
+  if (!p || (p.correct || 0) + (p.incorrect || 0) === 0) return 'unanswered';
+  return (p.incorrect || 0) > 0 ? 'wrong' : 'correctOnly';
+}
+
+function termStatusBadge(idx) {
+  const p = progress[idx];
+  const attempts = p ? (p.correct || 0) + (p.incorrect || 0) : 0;
+  if (!attempts) return '<span class="term-status status-unseen">未回答</span>';
+  const acc = Math.round(((p.correct || 0) / attempts) * 100);
+  const cls = (p.incorrect || 0) > 0 ? 'status-wrong' : 'status-correct';
+  return `<span class="term-status ${cls}">${acc}%</span>`;
+}
+
+const BROWSE_SORT_LABELS = {
+  default: '分類順（シラバス順）',
+  kana: '五十音順',
+  accAsc: '正答率が低い順',
+  accDesc: '正答率が高い順',
+};
+const BROWSE_STATUS_LABELS = {
+  ALL: 'すべて',
+  unanswered: '未回答',
+  wrong: '間違えたことがある',
+  correctOnly: '正解のみ（間違いなし）',
+};
 
 function renderBrowse() {
   const q = browseState.q.trim().toLowerCase();
@@ -2163,9 +2212,29 @@ function renderBrowse() {
   for (let i = 0; i < TERMS.length; i++) {
     const cat = CATS[TERMS[i].c];
     if (browseState.dai !== 'ALL' && cat.dai !== browseState.dai) continue;
+    if (browseState.chu !== 'ALL' && cat.chu !== browseState.chu) continue;
+    if (browseState.status !== 'ALL' && termStatus(i) !== browseState.status) continue;
     if (q && !TERMS[i].t.toLowerCase().includes(q) && !TERMS[i].d.toLowerCase().includes(q)) continue;
     idxs.push(i);
   }
+
+  if (browseState.sort === 'kana') {
+    idxs.sort((a, b) => TERMS[a].t.localeCompare(TERMS[b].t, 'ja'));
+  } else if (browseState.sort === 'accAsc' || browseState.sort === 'accDesc') {
+    const accOf = i => {
+      const p = progress[i];
+      const attempts = p ? (p.correct || 0) + (p.incorrect || 0) : 0;
+      return attempts ? (p.correct || 0) / attempts : null;
+    };
+    idxs.sort((a, b) => {
+      const aa = accOf(a), ab = accOf(b);
+      if (aa === null && ab === null) return 0;
+      if (aa === null) return 1;
+      if (ab === null) return -1;
+      return browseState.sort === 'accAsc' ? aa - ab : ab - aa;
+    });
+  }
+
   const totalPages = Math.max(1, Math.ceil(idxs.length / PAGE_SIZE));
   browseState.page = Math.min(browseState.page, totalPages - 1);
   const pageIdxs = idxs.slice(browseState.page * PAGE_SIZE, (browseState.page + 1) * PAGE_SIZE);
@@ -2174,11 +2243,14 @@ function renderBrowse() {
     const t = TERMS[i];
     const cat = CATS[t.c];
     return `<div class="term-row">
-      <div class="term-name">${esc(t.t)}</div>
+      <div class="term-name">${esc(t.t)}${termStatusBadge(i)}</div>
       <div class="term-cat">${esc(shortDai(cat.dai))} ／ ${esc(shortChu(cat.chu))}</div>
       <div class="term-def">${esc(t.d)}</div>
     </div>`;
   }).join('') : '<div class="empty">該当する用語がありません</div>';
+
+  const chuOptions = chuOptionsForDai(browseState.dai);
+  const filterSummary = `大分類:${browseState.dai === 'ALL' ? 'すべて' : shortDai(browseState.dai)}・中分類:${browseState.chu === 'ALL' ? 'すべて' : shortChu(browseState.chu)}・回答状況:${BROWSE_STATUS_LABELS[browseState.status]}・${BROWSE_SORT_LABELS[browseState.sort]}`;
 
   return `
   <h1>応用情報 用語暗記アプリ</h1>
@@ -2186,11 +2258,34 @@ function renderBrowse() {
   ${tabbar('browse')}
   <div class="card">
     <input type="text" id="search-input" placeholder="用語または意味で検索" value="${esc(browseState.q)}">
-    <label class="field">大分類で絞り込み</label>
-    <select id="browse-dai-select">
-      <option value="ALL" ${browseState.dai === 'ALL' ? 'selected' : ''}>すべて</option>
-      ${DAI_LIST.map(d => `<option value="${esc(d)}" ${browseState.dai === d ? 'selected' : ''}>${esc(shortDai(d))}</option>`).join('')}
-    </select>
+    <button class="settings-toggle${browseState.filtersExpanded ? ' expanded' : ''}" id="browse-filters-toggle" type="button" style="margin-top:12px;" aria-expanded="${browseState.filtersExpanded ? 'true' : 'false'}">
+      <span>🔍 絞り込み・並び替え</span>
+      <span class="chev">▾</span>
+    </button>
+    <div class="sub browse-summary">${esc(filterSummary)}</div>
+    <div class="settings-body" id="browse-filters-body" style="${browseState.filtersExpanded ? '' : 'display:none;'}">
+      <label class="field">大分類で絞り込み</label>
+      <select id="browse-dai-select">
+        <option value="ALL" ${browseState.dai === 'ALL' ? 'selected' : ''}>すべて</option>
+        ${DAI_LIST.map(d => `<option value="${esc(d)}" ${browseState.dai === d ? 'selected' : ''}>${esc(shortDai(d))}</option>`).join('')}
+      </select>
+
+      <label class="field">中分類で絞り込み</label>
+      <select id="browse-chu-select">
+        <option value="ALL" ${browseState.chu === 'ALL' ? 'selected' : ''}>すべて</option>
+        ${chuOptions.map(c => `<option value="${esc(c.chu)}" ${browseState.chu === c.chu ? 'selected' : ''}>${esc(shortChu(c.chu))}</option>`).join('')}
+      </select>
+
+      <label class="field">回答状況で絞り込み</label>
+      <select id="browse-status-select">
+        ${Object.entries(BROWSE_STATUS_LABELS).map(([v, label]) => `<option value="${v}" ${browseState.status === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+      </select>
+
+      <label class="field">並び順</label>
+      <select id="browse-sort-select">
+        ${Object.entries(BROWSE_SORT_LABELS).map(([v, label]) => `<option value="${v}" ${browseState.sort === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+      </select>
+    </div>
   </div>
   <div class="card">
     ${rows}
@@ -2335,7 +2430,20 @@ function attachHandlers() {
       });
     }
     const daiSelect = document.getElementById('browse-dai-select');
-    if (daiSelect) daiSelect.addEventListener('change', e => { browseState.dai = e.target.value; browseState.page = 0; render(); });
+    if (daiSelect) daiSelect.addEventListener('change', e => {
+      browseState.dai = e.target.value;
+      browseState.chu = 'ALL'; // the previous 中分類 choice may not exist under the new 大分類
+      browseState.page = 0;
+      render();
+    });
+    const chuSelect = document.getElementById('browse-chu-select');
+    if (chuSelect) chuSelect.addEventListener('change', e => { browseState.chu = e.target.value; browseState.page = 0; render(); });
+    const statusSelect = document.getElementById('browse-status-select');
+    if (statusSelect) statusSelect.addEventListener('change', e => { browseState.status = e.target.value; browseState.page = 0; render(); });
+    const sortSelect = document.getElementById('browse-sort-select');
+    if (sortSelect) sortSelect.addEventListener('change', e => { browseState.sort = e.target.value; browseState.page = 0; render(); });
+    const filtersToggle = document.getElementById('browse-filters-toggle');
+    if (filtersToggle) filtersToggle.addEventListener('click', () => { sfxClick(); browseState.filtersExpanded = !browseState.filtersExpanded; render(); });
     const prevBtn = document.getElementById('prev-page');
     if (prevBtn) prevBtn.addEventListener('click', () => { browseState.page--; render(); });
     const nextBtn2 = document.getElementById('next-page');
