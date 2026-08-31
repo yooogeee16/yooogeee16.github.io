@@ -185,6 +185,37 @@ body {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.25); }
 }
+.acronym-chip {
+  background: linear-gradient(135deg, rgba(74,222,128,0.16), rgba(34,211,238,0.12));
+  border-color: #4ade80;
+}
+.acronym-chip.active {
+  background: linear-gradient(135deg, #4ade80, #22d3ee);
+  color: #05060d;
+  box-shadow: 0 0 18px #4ade80, 0 0 4px #fff inset;
+}
+.acronym-mode-badge {
+  display: inline-block;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  color: #4ade80;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.acronym-theme .q-term {
+  font-family: 'Courier New', ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  color: #4ade80;
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.45);
+}
+.acronym-theme .card { border-color: rgba(74, 222, 128, 0.3); }
+.acronym-theme .progress-bar > div { background: #4ade80; }
+.acronym-start-btn { background: #4ade80 !important; color: #05060d !important; }
+.playmode-desc { margin: 8px 0 0; }
 .fever-banner {
   text-align: center;
   font-weight: 800;
@@ -1215,7 +1246,7 @@ function filteredIndices() {
   for (let i = 0; i < TERMS.length; i++) {
     const c = CATS[TERMS[i].c];
     if (!state.selectedDai.has(c.dai)) continue;
-    if (state.mode === 'acronym' && !ACRONYM_SET.has(i)) continue;
+    if (state.playMode === 'acronym' && !ACRONYM_SET.has(i)) continue;
     idxs.push(i);
   }
   return idxs;
@@ -1665,10 +1696,16 @@ function refreshFeaturedCarousel() {
 function renderHome() {
   const stats = overallStats();
   const poolCount = filteredIndices().length;
-  const modeLabel = state.mode === 'weak' ? '苦手優先' : state.mode === 'acronym' ? '略語のみ' : 'ランダム';
+  const modeLabel = state.mode === 'weak' ? '苦手優先' : 'ランダム';
   const dirLabel = state.direction === 'def2term' ? '意味→用語' : state.direction === 'mix' ? 'ミックス' : '用語→意味';
   const daiLabel = state.selectedDai.size === DAI_LIST.length ? '全分野' : `${state.selectedDai.size}/${DAI_LIST.length}分野`;
   const settingsSummary = `${daiLabel}・${state.count}問・${dirLabel}・${modeLabel}`;
+  const playModeDesc = {
+    classic: '標準的な4択クイズで、選んだ範囲から着実に用語を覚えます。',
+    shooting: '迫りくる敵を撃ち落としながら遊び感覚で暗記。被弾しても再出撃できます。',
+    dopa: '連続正解で画面が沸騰する高速モード。テンポは速く、コンボが切れると即終了。',
+    acronym: `英字の略語（RISC・TCPなど）${ACRONYM_SET.size}語だけに絞った専用クイズ。正式名称は解答後に確認できます。`,
+  }[state.playMode] || '';
   return `
   <h1 class="arcade-title">TERM INVADERS</h1>
   <div class="arcade-sub blink">応用情報技術者試験 用語暗記 &mdash; ${TERMS.length} TERMS LOADED</div>
@@ -1680,10 +1717,11 @@ function renderHome() {
     <span class="chip big ${state.playMode === 'classic' ? 'active' : ''}" data-playmode="classic">📋 クラシック（4択）</span>
     <span class="chip big ${state.playMode === 'shooting' ? 'active' : ''}" data-playmode="shooting">🚀 シューティング</span>
     <span class="chip big dopa-chip ${state.playMode === 'dopa' ? 'active' : ''}" data-playmode="dopa">⚡ DOPAシューティング</span>
+    <span class="chip big acronym-chip ${state.playMode === 'acronym' ? 'active' : ''}" data-playmode="acronym">🔤 略語チャレンジ</span>
   </div>
-  ${state.playMode === 'dopa' ? '<div class="sub" style="margin-top:8px;margin-bottom:0;">連続正解で画面が沸騰する高速モード。テンポは速く、コンボが切れると即終了。</div>' : ''}
+  <div class="sub playmode-desc">${esc(playModeDesc)}</div>
 
-  ${isShootingLike() ? shipCard() : ''}
+  ${shipCard()}
 
   <div class="card">
     <button class="settings-toggle${state.settingsExpanded ? ' expanded' : ''}" id="settings-toggle" type="button" aria-expanded="${state.settingsExpanded ? 'true' : 'false'}">
@@ -1717,12 +1755,11 @@ function renderHome() {
       <select id="mode-select">
         <option value="random" ${state.mode === 'random' ? 'selected' : ''}>ランダム</option>
         <option value="weak" ${state.mode === 'weak' ? 'selected' : ''}>苦手優先</option>
-        <option value="acronym" ${state.mode === 'acronym' ? 'selected' : ''}>🔤 略語のみ（${ACRONYM_SET.size}語）</option>
       </select>
     </div>
 
     <div class="sub" style="margin-top:10px;">現在の範囲: ${poolCount}語が対象</div>
-    <button class="btn" id="start-btn" style="margin-top:8px;" ${poolCount === 0 ? 'disabled' : ''}>${state.playMode === 'dopa' ? '⚡ DOPA出撃！' : state.playMode === 'shooting' ? '🚀 出撃する！' : 'クイズを始める'}</button>
+    <button class="btn ${state.playMode === 'acronym' ? 'acronym-start-btn' : ''}" id="start-btn" style="margin-top:8px;" ${poolCount === 0 ? 'disabled' : ''}>${state.playMode === 'dopa' ? '⚡ DOPA出撃！' : state.playMode === 'shooting' ? '🚀 出撃する！' : state.playMode === 'acronym' ? '🔤 略語チャレンジ開始' : 'クイズを始める'}</button>
   </div>
   ${renderFeaturedTerms()}
   <div class="card">
@@ -1869,9 +1906,11 @@ function renderQuiz() {
   });
 
   const emergency = isEmergency(quiz.correct, quiz.missed.length);
+  const isAcronymMode = state.playMode === 'acronym';
 
   return `
-  <div class="view-fill">
+  <div class="view-fill${isAcronymMode ? ' acronym-theme' : ''}">
+  ${isAcronymMode ? '<div class="acronym-mode-badge">🔤 略語チャレンジ</div>' : ''}
   <div class="progress-bar"><div style="width:${pct}%"></div></div>
   <div class="q-meta">${quiz.cursor + 1} / ${quiz.questions.length} 問　正解 ${quiz.correct}　|　${esc(shortDai(cat.dai))} ／ ${esc(shortChu(cat.chu))}${quiz.streak >= 2 ? `　<span class="combo-badge">🔥 COMBO x${quiz.streak}</span>` : ''}${emergency ? `　<span class="emergency-badge">⚠ EMERGENCY</span>` : ''}</div>
   <div class="card${emergency ? ' emergency' : ''}">
