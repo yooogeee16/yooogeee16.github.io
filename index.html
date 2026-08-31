@@ -216,7 +216,7 @@ body {
   0%, 100% { background-color: rgba(248, 113, 113, 0.12); }
   50% { background-color: rgba(248, 113, 113, 0.3); }
 }
-#mute-toggle, #info-toggle {
+#mute-toggle, #info-toggle, #ios-install-toggle {
   position: fixed;
   top: 12px;
   z-index: 91;
@@ -232,6 +232,8 @@ body {
 }
 #mute-toggle { right: 12px; }
 #info-toggle { right: 58px; font-size: 0.85rem; font-weight: 700; font-style: italic; }
+#ios-install-toggle { right: 104px; font-size: 1.05rem; display: none; }
+#ios-install-toggle.visible { display: block; }
 #legal-modal, #ship-dex-modal, #ios-install-modal {
   position: fixed;
   inset: 0;
@@ -671,6 +673,7 @@ button.btn.danger {
 <canvas id="bg-stars"></canvas>
 <div id="flash-overlay"></div>
 <button id="info-toggle" title="このアプリについて（利用上の注意）">ⓘ</button>
+<button id="ios-install-toggle" title="ホーム画面に追加する方法">📲</button>
 <button id="mute-toggle" title="効果音のオン/オフ">🔊</button>
 <div id="legal-modal">
   <div class="legal-card">
@@ -919,12 +922,21 @@ const IOS_INSTALL_SEEN_KEY = 'ap_tango_ios_install_seen_v1';
 function initIOSInstallPrompt() {
   const modal = document.getElementById('ios-install-modal');
   const closeBtn = document.getElementById('ios-install-close-btn');
+  const toggleBtn = document.getElementById('ios-install-toggle');
   if (!modal) return;
   if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.remove('open'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 
   const isIPhone = /iPhone/.test(navigator.userAgent) && !window.MSStream;
   const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+  // Always-available button (top right) to reopen the guide any time,
+  // shown only on iPhone browsers that aren't already installed.
+  if (toggleBtn && isIPhone && !isStandalone) {
+    toggleBtn.classList.add('visible');
+    toggleBtn.addEventListener('click', () => { sfxClick(); modal.classList.add('open'); });
+  }
+
   const alreadySeen = localStorage.getItem(IOS_INSTALL_SEEN_KEY) === '1';
   if (isIPhone && !isStandalone && !alreadySeen) {
     setTimeout(() => {
