@@ -464,6 +464,25 @@ button.btn.danger {
 }
 .btn-row { display: flex; gap: 8px; margin-top: 10px; }
 .btn-row > button { flex: 1; }
+.settings-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.settings-toggle .chev { color: var(--muted); font-size: 0.8rem; transition: transform 0.2s ease; }
+.settings-toggle.expanded .chev { transform: rotate(180deg); }
+.settings-summary { margin: 4px 0 0; }
+.settings-body { margin-top: 12px; }
+.settings-body > .field:first-child { margin-top: 0; }
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -753,7 +772,7 @@ button.btn.danger {
     <p>本アプリは個人が作成したものであり、独立行政法人情報処理推進機構（IPA）およびIPAが実施する情報処理技術者試験制度とは一切関係ありません。IPAによる承認・監修・保証を受けたものではなく、内容の正確性・最新性を公式に保証するものでもありません。学習の最終確認には、必ずIPAが公表する<a href="https://www.ipa.go.jp/shiken/syllabus/gaiyou.html" target="_blank" rel="noopener">公式シラバス・出題範囲</a>をご参照ください。</p>
 
     <h3>収録用語と著作権について</h3>
-    <p>収録している用語（見出し語）は、IPAが公開する「応用情報技術者試験シラバス（Ver.7.2）」に用語例として掲載されている語をもとに構成しています。各用語の<strong>説明文・定義文はすべて本アプリの作成過程で独自に作成したもの</strong>であり、シラバス原文の文章を複製・転載したものではありません。</p>
+    <p>収録している用語（見出し語）は、IPAが公開する「応用情報技術者試験シラバス（Ver.7.2）」に用語例として掲載されている語をもとに構成しています。各用語の<strong>説明文・定義文、および4択クイズの誤答選択肢は、生成AIを用いて本アプリの作成過程で独自に作成したもの</strong>であり、シラバス原文の文章を複製・転載したものではありません。AIによる生成のため、まれに不正確な記述を含む可能性があります。学習の最終確認には公式シラバスをご参照ください。</p>
 
     <h3>商標について</h3>
     <p>アプリ内に登場する会社名・製品名・規格名等は、それぞれ各社・各団体の商標または登録商標です。本アプリはそれらの商標権者と提携するものではなく、教育目的での説明的な言及にとどまります。</p>
@@ -1178,7 +1197,7 @@ let state = {
   count: 20,
   direction: 'term2def',
   mode: 'random',
-  acronymOnly: false,
+  settingsExpanded: false,
   quiz: null,
 };
 
@@ -1196,7 +1215,7 @@ function filteredIndices() {
   for (let i = 0; i < TERMS.length; i++) {
     const c = CATS[TERMS[i].c];
     if (!state.selectedDai.has(c.dai)) continue;
-    if (state.acronymOnly && !ACRONYM_SET.has(i)) continue;
+    if (state.mode === 'acronym' && !ACRONYM_SET.has(i)) continue;
     idxs.push(i);
   }
   return idxs;
@@ -1646,6 +1665,10 @@ function refreshFeaturedCarousel() {
 function renderHome() {
   const stats = overallStats();
   const poolCount = filteredIndices().length;
+  const modeLabel = state.mode === 'weak' ? '苦手優先' : state.mode === 'acronym' ? '略語のみ' : 'ランダム';
+  const dirLabel = state.direction === 'def2term' ? '意味→用語' : state.direction === 'mix' ? 'ミックス' : '用語→意味';
+  const daiLabel = state.selectedDai.size === DAI_LIST.length ? '全分野' : `${state.selectedDai.size}/${DAI_LIST.length}分野`;
+  const settingsSummary = `${daiLabel}・${state.count}問・${dirLabel}・${modeLabel}`;
   return `
   <h1 class="arcade-title">TERM INVADERS</h1>
   <div class="arcade-sub blink">応用情報技術者試験 用語暗記 &mdash; ${TERMS.length} TERMS LOADED</div>
@@ -1663,36 +1686,39 @@ function renderHome() {
   ${isShootingLike() ? shipCard() : ''}
 
   <div class="card">
-    <label class="field" style="margin-top:0;">出題範囲（大分類）</label>
-    <div class="row" id="dai-chips">
-      ${DAI_LIST.map(d => `<span class="chip ${state.selectedDai.has(d) ? 'active' : ''}" data-dai="${esc(d)}">${esc(shortDai(d))}</span>`).join('')}
-    </div>
-    <div class="row" style="margin-top:8px;">
-      <span class="chip" id="dai-all">全選択</span>
-      <span class="chip" id="dai-none">全解除</span>
-    </div>
+    <button class="settings-toggle${state.settingsExpanded ? ' expanded' : ''}" id="settings-toggle" type="button" aria-expanded="${state.settingsExpanded ? 'true' : 'false'}">
+      <span>⚙️ 出題範囲・形式などの設定</span>
+      <span class="chev">▾</span>
+    </button>
+    <div class="sub settings-summary">${esc(settingsSummary)}</div>
+    <div class="settings-body" id="settings-body" style="${state.settingsExpanded ? '' : 'display:none;'}">
+      <label class="field">出題範囲（大分類）</label>
+      <div class="row" id="dai-chips">
+        ${DAI_LIST.map(d => `<span class="chip ${state.selectedDai.has(d) ? 'active' : ''}" data-dai="${esc(d)}">${esc(shortDai(d))}</span>`).join('')}
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <span class="chip" id="dai-all">全選択</span>
+        <span class="chip" id="dai-none">全解除</span>
+      </div>
 
-    <label class="field">${isShootingLike() ? '出題数（ウェーブ数）' : '出題数'}</label>
-    <select id="count-select">
-      ${[10, 20, 30, 50, 100].map(n => `<option value="${n}" ${state.count === n ? 'selected' : ''}>${n}問</option>`).join('')}
-    </select>
+      <label class="field">${isShootingLike() ? '出題数（ウェーブ数）' : '出題数'}</label>
+      <select id="count-select">
+        ${[10, 20, 30, 50, 100].map(n => `<option value="${n}" ${state.count === n ? 'selected' : ''}>${n}問</option>`).join('')}
+      </select>
 
-    <label class="field">出題形式</label>
-    <select id="direction-select">
-      <option value="term2def" ${state.direction === 'term2def' ? 'selected' : ''}>用語 → 意味を選ぶ</option>
-      <option value="def2term" ${state.direction === 'def2term' ? 'selected' : ''}>意味 → 用語を選ぶ</option>
-      <option value="mix" ${state.direction === 'mix' ? 'selected' : ''}>ミックス</option>
-    </select>
+      <label class="field">出題形式</label>
+      <select id="direction-select">
+        <option value="term2def" ${state.direction === 'term2def' ? 'selected' : ''}>用語 → 意味を選ぶ</option>
+        <option value="def2term" ${state.direction === 'def2term' ? 'selected' : ''}>意味 → 用語を選ぶ</option>
+        <option value="mix" ${state.direction === 'mix' ? 'selected' : ''}>ミックス</option>
+      </select>
 
-    <label class="field">出題モード</label>
-    <select id="mode-select">
-      <option value="random" ${state.mode === 'random' ? 'selected' : ''}>ランダム</option>
-      <option value="weak" ${state.mode === 'weak' ? 'selected' : ''}>苦手優先</option>
-    </select>
-
-    <label class="field">出題タイプ</label>
-    <div class="row">
-      <span class="chip ${state.acronymOnly ? 'active' : ''}" id="acronym-toggle">🔤 略語のみ出題（${ACRONYM_SET.size}語）</span>
+      <label class="field">出題モード</label>
+      <select id="mode-select">
+        <option value="random" ${state.mode === 'random' ? 'selected' : ''}>ランダム</option>
+        <option value="weak" ${state.mode === 'weak' ? 'selected' : ''}>苦手優先</option>
+        <option value="acronym" ${state.mode === 'acronym' ? 'selected' : ''}>🔤 略語のみ（${ACRONYM_SET.size}語）</option>
+      </select>
     </div>
 
     <div class="sub" style="margin-top:10px;">現在の範囲: ${poolCount}語が対象</div>
@@ -1701,8 +1727,8 @@ function renderHome() {
   ${renderFeaturedTerms()}
   <div class="card">
     <label class="field" style="margin-top:0;">このアプリについて</label>
-    <p class="about-text">TERM INVADERSは、応用情報技術者試験のシラバス（Ver.7.2）に掲載された用語をもとに作られた、無料の暗記学習アプリです。基礎理論・アルゴリズム・ネットワーク・セキュリティ・マネジメント・ストラテジ系まで、試験範囲全体をカバーする${TERMS.length}語を収録しています。</p>
-    <p class="about-text">「クラシック」では標準的な4択形式のクイズで着実に用語を覚えられます。「シューティング」「DOPAシューティング」では、迫りくる敵を撃ち落としながら遊び感覚で暗記でき、正解を続けるほど自機がレベルアップしていきます。3〜5文字の略語だけに絞って出題する「略語のみ出題」モードも搭載しています。</p>
+    <p class="about-text">TERM INVADERSは、応用情報技術者試験のシラバス（Ver.7.2）に掲載された用語をもとに作られた、無料の暗記学習アプリです。基礎理論・アルゴリズム・ネットワーク・セキュリティ・マネジメント・ストラテジ系まで、試験範囲全体をカバーする${TERMS.length}語を収録しています。各用語の説明文やクイズの選択肢は生成AIを用いて作成しており、内容の正確性は保証されませんので、最終確認には公式シラバスをご参照ください。</p>
+    <p class="about-text">「クラシック」では標準的な4択形式のクイズで着実に用語を覚えられます。「シューティング」「DOPAシューティング」では、迫りくる敵を撃ち落としながら遊び感覚で暗記でき、正解を続けるほど自機がレベルアップしていきます。出題モードを「略語のみ」に切り替えれば、英字の略語だけに絞って出題することもできます。</p>
     <p class="about-text">学習の記録はすべて端末内（ブラウザのlocalStorage）に保存され、分析タブでは大分類別の学習状況や苦手な用語を確認できます。登録・ログインは不要で、このページを開くだけですぐに学習を始められます。</p>
   </div>
   <div class="home-footer-stats">この端末でのアクセス数 ${visitCount}回　|　全ユーザー累計 <span id="global-visit-count">${globalVisitCount !== null ? globalVisitCount.toLocaleString() : '…'}</span>回　|　解答数 ${stats.attempts}問</div>
@@ -1982,13 +2008,13 @@ function attachHandlers() {
     if (noneBtn) noneBtn.addEventListener('click', () => { sfxClick(); state.selectedDai = new Set(); render(); });
 
     const countSel = document.getElementById('count-select');
-    if (countSel) countSel.addEventListener('change', e => { state.count = parseInt(e.target.value, 10); });
+    if (countSel) countSel.addEventListener('change', e => { state.count = parseInt(e.target.value, 10); render(); });
     const dirSel = document.getElementById('direction-select');
-    if (dirSel) dirSel.addEventListener('change', e => { state.direction = e.target.value; });
+    if (dirSel) dirSel.addEventListener('change', e => { state.direction = e.target.value; render(); });
     const modeSel = document.getElementById('mode-select');
-    if (modeSel) modeSel.addEventListener('change', e => { state.mode = e.target.value; });
-    const acronymToggle = document.getElementById('acronym-toggle');
-    if (acronymToggle) acronymToggle.addEventListener('click', () => { sfxClick(); state.acronymOnly = !state.acronymOnly; render(); });
+    if (modeSel) modeSel.addEventListener('change', e => { state.mode = e.target.value; render(); });
+    const settingsToggle = document.getElementById('settings-toggle');
+    if (settingsToggle) settingsToggle.addEventListener('click', () => { sfxClick(); state.settingsExpanded = !state.settingsExpanded; render(); });
 
     initFeaturedCarousel();
 
