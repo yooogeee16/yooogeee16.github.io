@@ -581,6 +581,37 @@ button.btn.danger {
   margin-top: 1px;
 }
 .featured-term-body { flex: 1; min-width: 0; }
+.featured-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.featured-dots { display: flex; gap: 5px; }
+.featured-dots .dot {
+  display: inline-block;
+  box-sizing: content-box;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.5;
+  transition: background 0.2s, transform 0.2s, opacity 0.2s;
+  cursor: pointer;
+  padding: 5px;
+  margin: -5px;
+  background-clip: content-box;
+}
+.featured-dots .dot.active { background: var(--accent); opacity: 1; transform: scale(1.3); }
+.featured-viewport { overflow: hidden; touch-action: pan-y; }
+.featured-track { display: flex; transition: transform 0.3s ease; }
+.featured-slide { flex-shrink: 0; box-sizing: border-box; padding-right: 2px; }
+.featured-arrows { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; }
+.featured-nav {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: var(--text);
+  font-size: 0.78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.featured-swipe-hint { font-size: 0.68rem; color: var(--muted); text-align: center; flex: 1; }
 .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
 .pager button { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text); cursor: pointer; }
 .pager button:disabled { opacity: 0.4; cursor: default; }
@@ -1111,6 +1142,18 @@ function acronymCore(term) {
   if (/^[A-Z][A-Z0-9\/\-]{1,6}$/.test(stripped)) return stripped;
   return null;
 }
+// The English official name inside a "ACRONYM（English Name：日本語）"-style
+// acronym term, e.g. "BCD（Binary Coded Decimal：2進化10進）" -> "Binary Coded
+// Decimal". Used to surface the full name at explanation time, since the
+// question/choice text itself never shows it (see termDisplay below) -- real
+// exam questions don't spell the acronym out either.
+function acronymExpansion(term) {
+  if (!acronymCore(term)) return null;
+  const m = term.match(/[（(]([^）)]*)[）)]/);
+  if (!m) return null;
+  const english = m[1].split(/[：:]/)[0].trim();
+  return english || null;
+}
 const ACRONYM_SET = new Set();
 for (let i = 0; i < TERMS.length; i++) if (acronymCore(TERMS[i].t)) ACRONYM_SET.add(i);
 
@@ -1145,12 +1188,14 @@ function filteredIndices() {
   return idxs;
 }
 
-// Display form of a term for an active question: in acronym mode, show just
-// the bare acronym (RISC) instead of the full "RISC（Reduced ... ）" string,
-// so the parenthetical expansion doesn't give the answer away.
+// Display form of a term for an active question: always show just the bare
+// acronym (RISC) instead of the full "RISC（Reduced ... ）" string when the
+// term is acronym-style, so the parenthetical English name never leaks into
+// the question/choice text -- the real exam doesn't spell it out there
+// either. (The full name still shows up in the post-answer explanation via
+// choiceCaption/acronymExpansion.)
 function termDisplay(idx) {
   const t = TERMS[idx].t;
-  if (!state.acronymOnly) return t;
   return acronymCore(t) || t;
 }
 
@@ -1483,26 +1528,81 @@ function invaderSvg(color, size) {
   }));
   return `<svg width="${size}" height="${Math.round(size * 8 / 9)}" viewBox="0 0 ${(9 * cell).toFixed(1)} ${(8 * cell).toFixed(1)}" aria-hidden="true">${rects}</svg>`;
 }
+// Shown as a one-at-a-time swipeable carousel (see initFeaturedCarousel):
+// all picked terms sit side-by-side in a flex track, but only one is in
+// view at a time, sliding over on swipe/tap. Every slide still has its
+// full term+definition text in the DOM (not fetched/injected later), so
+// this stays real indexable content, not just an empty JS shell.
 function renderFeaturedTerms() {
   const idxs = FEATURED_TERM_POOL.map(name => TERMS.findIndex(t => t.t === name)).filter(i => i >= 0);
   const picked = shuffle(idxs).slice(0, 5);
-  const rows = picked.map((i, n) => {
+  if (!picked.length) return '';
+  const slideWidth = (100 / picked.length).toFixed(4);
+  const slides = picked.map((i, n) => {
     const color = FEATURED_INVADER_COLORS[n % FEATURED_INVADER_COLORS.length];
-    return `<div class="term-row featured-term-row">
-      <div class="featured-invader">${invaderSvg(color, 24)}</div>
-      <div class="featured-term-body">
-        <div class="term-name">${esc(TERMS[i].t)}</div>
-        <div class="term-def">${esc(TERMS[i].d)}</div>
+    return `<div class="featured-slide" style="flex:0 0 ${slideWidth}%;width:${slideWidth}%;">
+      <div class="featured-term-row">
+        <div class="featured-invader">${invaderSvg(color, 24)}</div>
+        <div class="featured-term-body">
+          <div class="term-name">${esc(TERMS[i].t)}</div>
+          <div class="term-def">${esc(TERMS[i].d)}</div>
+        </div>
       </div>
     </div>`;
   }).join('');
-  if (!rows) return '';
+  const dots = picked.map((_, n) => `<span class="dot${n === 0 ? ' active' : ''}" data-dot="${n}"></span>`).join('');
   return `
   <div class="card">
-    <label class="field" style="margin-top:0;">収録用語の一例</label>
-    ${rows}
+    <div class="featured-head">
+      <label class="field" style="margin:0;">収録用語の一例</label>
+      <div class="featured-dots" id="featured-dots">${dots}</div>
+    </div>
+    <div class="featured-viewport" id="featured-viewport">
+      <div class="featured-track" id="featured-track" style="width:${picked.length * 100}%;">${slides}</div>
+    </div>
+    <div class="featured-arrows">
+      <button class="featured-nav" id="featured-prev" type="button" aria-label="前の用語">‹ 前へ</button>
+      <span class="featured-swipe-hint">👆スワイプでも切替できます</span>
+      <button class="featured-nav" id="featured-next" type="button" aria-label="次の用語">次へ ›</button>
+    </div>
     <div class="sub" style="margin:8px 0 0;">ほか ${TERMS.length}語を収録（<a href="#" data-tab="browse" style="color:var(--accent);">用語一覧で検索</a>）</div>
   </div>`;
+}
+
+function initFeaturedCarousel() {
+  const viewport = document.getElementById('featured-viewport');
+  const track = document.getElementById('featured-track');
+  if (!viewport || !track) return;
+  const count = track.children.length;
+  if (!count) return;
+  const dots = document.querySelectorAll('#featured-dots .dot');
+  let index = 0;
+  function goTo(i) {
+    index = ((i % count) + count) % count;
+    track.style.transform = `translateX(-${index * (100 / count)}%)`;
+    dots.forEach((d, di) => d.classList.toggle('active', di === index));
+  }
+  const prevBtn = document.getElementById('featured-prev');
+  const nextBtn = document.getElementById('featured-next');
+  if (prevBtn) prevBtn.addEventListener('click', () => { sfxClick(); goTo(index - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { sfxClick(); goTo(index + 1); });
+  dots.forEach((d, di) => d.addEventListener('click', () => { sfxClick(); goTo(di); }));
+
+  let startX = null, startY = null;
+  viewport.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  viewport.addEventListener('touchend', e => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    startX = null; startY = null;
+    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy)) {
+      sfxClick();
+      goTo(index + (dx < 0 ? 1 : -1));
+    }
+  }, { passive: true });
 }
 
 function renderHome() {
@@ -1732,8 +1832,13 @@ function truncate(s, n) {
 }
 function choiceCaption(idx, dir) {
   const t = TERMS[idx];
-  if (dir === 'term2def') return t.t; // choice shows the definition -> caption shows the term
-  return truncate(t.d, 65); // choice shows the term -> caption shows a short definition
+  if (dir === 'term2def') return t.t; // choice shows the definition -> caption shows the full term (English name included, if any)
+  // choice shows the (acronym-stripped) term -> caption shows a short definition;
+  // for acronym terms, also surface the English official name here, since the
+  // question/choice text itself never shows it.
+  const expansion = acronymExpansion(t.t);
+  const defPart = truncate(t.d, expansion ? 48 : 65);
+  return expansion ? `${defPart}（${expansion}）` : defPart;
 }
 
 function renderResult() {
@@ -1846,6 +1951,8 @@ function attachHandlers() {
     if (modeSel) modeSel.addEventListener('change', e => { state.mode = e.target.value; });
     const acronymToggle = document.getElementById('acronym-toggle');
     if (acronymToggle) acronymToggle.addEventListener('click', () => { sfxClick(); state.acronymOnly = !state.acronymOnly; render(); });
+
+    initFeaturedCarousel();
 
     const startBtn = document.getElementById('start-btn');
     if (startBtn) startBtn.addEventListener('click', () => {
