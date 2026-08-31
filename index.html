@@ -418,13 +418,17 @@ h1.home-title {
 .chip:active { transform: scale(0.94); }
 .chip.big {
   padding: 14px 16px;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   font-weight: 700;
   flex: 1;
   min-width: 140px;
   text-align: center;
   border-radius: 12px;
+  white-space: normal;
+  line-height: 1.3;
+  overflow-wrap: break-word;
 }
+.chip.big .nobreak { white-space: nowrap; }
 .chip.big.active { box-shadow: 0 0 18px var(--accent), 0 0 2px #fff inset; }
 .combo-badge {
   display: inline-block;
@@ -1770,9 +1774,9 @@ function renderHome() {
   <div class="card">
     <label class="field" style="margin-top:0;">プレイモード</label>
     <div class="row">
-      <span class="chip big ${state.playMode === 'classic' ? 'active' : ''}" data-playmode="classic">📋 クラシック（4択）</span>
+      <span class="chip big ${state.playMode === 'classic' ? 'active' : ''}" data-playmode="classic">📋 クラシック<span class="nobreak">（4択）</span></span>
       <span class="chip big ${state.playMode === 'shooting' ? 'active' : ''}" data-playmode="shooting">🚀 シューティング</span>
-      <span class="chip big dopa-chip ${state.playMode === 'dopa' ? 'active' : ''}" data-playmode="dopa">⚡ DOPAシューティング</span>
+      <span class="chip big dopa-chip ${state.playMode === 'dopa' ? 'active' : ''}" data-playmode="dopa">⚡ DOPA</span>
       <span class="chip big acronym-chip ${state.playMode === 'acronym' ? 'active' : ''}" data-playmode="acronym">🔤 略語チャレンジ</span>
     </div>
     <div class="sub playmode-desc">${esc(playModeDesc)}</div>
