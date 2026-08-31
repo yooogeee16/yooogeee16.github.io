@@ -89,8 +89,11 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
 }
+/* overflow-x:hidden on html alone (not body too) so body isn't also a
+   scroll container -- position:sticky needs a single, unambiguous
+   scrolling ancestor to stick against. */
+html { overflow-x: hidden; }
 body {
   min-height: 100vh;
   display: flex;
@@ -359,6 +362,15 @@ h1.arcade-title {
   margin: 10px 0 2px;
   color: #fff;
   text-shadow: 0 0 6px var(--accent), 0 0 18px var(--accent), 0 0 2px #fff;
+}
+h1.home-title {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: 0 -16px 2px;
+  padding: 46px 16px 8px;
+  background: linear-gradient(180deg, rgba(5,6,13,0.96) 78%, rgba(5,6,13,0) 100%);
+  backdrop-filter: blur(6px);
 }
 .arcade-sub {
   text-align: center;
@@ -718,11 +730,29 @@ button.btn.danger {
 
 /* ship / level HUD (used in home + shooting) */
 .ship-card { display: flex; align-items: center; gap: 12px; }
+.ship-card.ship-card-preview { flex-direction: column; gap: 4px; text-align: center; }
 .ship-tier-badge {
   width: 46px; height: 46px; border-radius: 10px; background: var(--gold-bg);
   display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 700; color: var(--gold);
   flex-shrink: 0;
 }
+.ship-preview-wrap { position: relative; width: 96px; height: 96px; }
+.ship-preview-wrap canvas { display: block; width: 100%; height: 100%; }
+.ship-tier-badge-overlay {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--gold-bg);
+  color: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--card);
+}
+.ship-level-info { width: 100%; }
+.ship-level-line { font-size: 0.85rem; font-weight: 600; }
+.ship-xp-text { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
 .xp-bar { height: 8px; background: var(--chip-bg); border-radius: 4px; overflow: hidden; margin-top: 4px; }
 .xp-bar > div { height: 100%; background: var(--gold); }
 .ship-card-tap { cursor: pointer; }
@@ -1545,16 +1575,41 @@ function tabbar(active) {
   </div>`;
 }
 
+// Small idle-bobbing preview of the player's current ship, drawn with the
+// same drawShip() used in the shooting game and the ship dex modal. Runs its
+// own rAF loop rather than piggybacking on the game loop, and self-stops the
+// moment its canvas leaves the DOM (the next render() call replaces #app's
+// innerHTML wholesale, which detaches it without any explicit teardown).
+let shipPreviewRaf = null;
+function initShipPreview() {
+  const canvas = document.getElementById('ship-preview-canvas');
+  if (!canvas) return;
+  if (shipPreviewRaf) cancelAnimationFrame(shipPreviewRaf);
+  const ctx = canvas.getContext('2d');
+  const tier = tierForLevel(ship.level);
+  function frame(now) {
+    if (!document.body.contains(canvas)) { shipPreviewRaf = null; return; }
+    ctx.clearRect(0, 0, 96, 96);
+    const bob = Math.sin(now / 500) * 3;
+    drawShip(ctx, 48, 54 + bob, tier);
+    shipPreviewRaf = requestAnimationFrame(frame);
+  }
+  shipPreviewRaf = requestAnimationFrame(frame);
+}
+
 function shipCard() {
   const tier = tierForLevel(ship.level);
   const need = xpForLevel(ship.level);
   const pct = Math.round((ship.xp / need) * 100);
-  return `<div class="card ship-card ship-card-tap" id="ship-dex-open">
-    <div class="ship-tier-badge">T${tier}</div>
-    <div style="flex:1;">
-      <div style="font-size:0.85rem;font-weight:600;">Lv.${ship.level} 機体 <span class="dex-hint">図鑑を見る ›</span></div>
+  return `<div class="card ship-card ship-card-preview ship-card-tap" id="ship-dex-open">
+    <div class="ship-preview-wrap">
+      <canvas id="ship-preview-canvas" width="96" height="96"></canvas>
+      <span class="ship-tier-badge-overlay">T${tier}</span>
+    </div>
+    <div class="ship-level-info">
+      <div class="ship-level-line">Lv.${ship.level} 機体 <span class="dex-hint">図鑑を見る ›</span></div>
       <div class="xp-bar"><div style="width:${pct}%"></div></div>
-      <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">XP ${ship.xp} / ${need}</div>
+      <div class="ship-xp-text">XP ${ship.xp} / ${need}</div>
     </div>
   </div>`;
 }
@@ -1707,19 +1762,21 @@ function renderHome() {
     acronym: `英字の略語（RISC・TCPなど）${ACRONYM_SET.size}語だけに絞った専用クイズ。正式名称は解答後に確認できます。`,
   }[state.playMode] || '';
   return `
-  <h1 class="arcade-title">TERM INVADERS</h1>
+  <h1 class="arcade-title home-title">TERM INVADERS</h1>
   <div class="arcade-sub blink">応用情報技術者試験 用語暗記 &mdash; ${TERMS.length} TERMS LOADED</div>
   ${tabbar('home')}
   ${renderGradeCard()}
 
-  <label class="field" style="margin-top:0;">プレイモード</label>
-  <div class="row">
-    <span class="chip big ${state.playMode === 'classic' ? 'active' : ''}" data-playmode="classic">📋 クラシック（4択）</span>
-    <span class="chip big ${state.playMode === 'shooting' ? 'active' : ''}" data-playmode="shooting">🚀 シューティング</span>
-    <span class="chip big dopa-chip ${state.playMode === 'dopa' ? 'active' : ''}" data-playmode="dopa">⚡ DOPAシューティング</span>
-    <span class="chip big acronym-chip ${state.playMode === 'acronym' ? 'active' : ''}" data-playmode="acronym">🔤 略語チャレンジ</span>
+  <div class="card">
+    <label class="field" style="margin-top:0;">プレイモード</label>
+    <div class="row">
+      <span class="chip big ${state.playMode === 'classic' ? 'active' : ''}" data-playmode="classic">📋 クラシック（4択）</span>
+      <span class="chip big ${state.playMode === 'shooting' ? 'active' : ''}" data-playmode="shooting">🚀 シューティング</span>
+      <span class="chip big dopa-chip ${state.playMode === 'dopa' ? 'active' : ''}" data-playmode="dopa">⚡ DOPAシューティング</span>
+      <span class="chip big acronym-chip ${state.playMode === 'acronym' ? 'active' : ''}" data-playmode="acronym">🔤 略語チャレンジ</span>
+    </div>
+    <div class="sub playmode-desc">${esc(playModeDesc)}</div>
   </div>
-  <div class="sub playmode-desc">${esc(playModeDesc)}</div>
 
   ${shipCard()}
 
@@ -2166,6 +2223,8 @@ function attachHandlers() {
     const homeBtn = document.getElementById('sg-home-btn');
     if (homeBtn) homeBtn.addEventListener('click', () => { sfxClick(); state.view = 'home'; render(); });
   }
+
+  initShipPreview();
 }
 
 /* =====================================================================
