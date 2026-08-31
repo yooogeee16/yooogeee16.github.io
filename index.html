@@ -416,6 +416,10 @@ h1.arcade-title {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  /* Clears the fixed mute/info/iOS-install buttons (top:12px, 38px tall,
+     spanning up to ~142px from the right edge) so HUD/progress content
+     never sits underneath them. */
+  padding-top: 48px;
 }
 label.field {
   display: block;
@@ -873,6 +877,8 @@ const BGM_TRACKS = {
   classic: { wave: 'triangle', step: 0.30, gain: 0.05, notes: [261.63, 329.63, 392.00, 329.63, 349.23, 440.00, 392.00, 329.63] },
   // fast, driving loop for DOPA
   dopa: { wave: 'square', step: 0.145, gain: 0.035, notes: [329.63, 392.00, 440.00, 493.88, 440.00, 392.00, 329.63, 293.66] },
+  // punchy mid-tempo loop for regular シューティング (between classic and DOPA)
+  shooting: { wave: 'square', step: 0.22, gain: 0.04, notes: [246.94, 293.66, 329.63, 293.66, 220.00, 261.63, 293.66, 246.94] },
 };
 const BGM = { track: null, timer: null, noteIndex: 0 };
 function bgmScheduleNext() {
@@ -897,16 +903,14 @@ function stopBGM() {
   if (BGM.timer) clearTimeout(BGM.timer);
   BGM.timer = null;
 }
-// Decide which (if any) BGM track fits the current screen. Only ホーム
-// (incl. 分析/用語一覧), クラシック, and DOPAシューティング have music;
-// 通常シューティング stays sound-effects-only.
+// Decide which (if any) BGM track fits the current screen.
 function updateBGM() {
   if (state.view === 'home' || state.view === 'analytics' || state.view === 'browse') {
     playBGM('home');
   } else if (state.view === 'quiz' || state.view === 'result') {
     playBGM('classic');
   } else if (state.view === 'shooting' || state.view === 'shootingResult') {
-    if (SG.dopa) playBGM('dopa'); else stopBGM();
+    playBGM(SG.dopa ? 'dopa' : 'shooting');
   } else {
     stopBGM();
   }
@@ -1303,16 +1307,30 @@ function gradeVolumeCap(answered) {
   if (answered < 100) return 9;  // A
   return GRADE_TIERS.length - 1; // uncapped
 }
-function computeGrade(correct, answered) {
-  if (!answered) return { grade: '-', acc: 0 };
+// Answering the same handful of terms over and over shouldn't reach S+ either
+// -- reward breadth across the whole term pool, not just raw attempt count.
+function gradeCoverageCap(studied, total) {
+  const ratio = total ? studied / total : 0;
+  if (ratio < 0.01) return 3;   // C  (< 1% of all terms studied)
+  if (ratio < 0.03) return 6;   // B
+  if (ratio < 0.08) return 9;   // A
+  return GRADE_TIERS.length - 1; // uncapped
+}
+function computeGrade(correct, answered, studied, total) {
+  if (!answered) return { grade: '-', acc: 0, coverage: 0 };
   const acc = Math.round((correct / answered) * 100);
-  const idx = Math.min(gradeIndexFromAccuracy(acc), gradeVolumeCap(answered));
-  return { grade: GRADE_TIERS[idx], acc };
+  const coverage = total ? Math.round((studied / total) * 1000) / 10 : 0;
+  const idx = Math.min(
+    gradeIndexFromAccuracy(acc),
+    gradeVolumeCap(answered),
+    gradeCoverageCap(studied, total)
+  );
+  return { grade: GRADE_TIERS[idx], acc, coverage };
 }
 
 function renderGradeCard() {
   const stats = overallStats();
-  const { grade, acc } = computeGrade(stats.correct, stats.attempts);
+  const { grade, acc, coverage } = computeGrade(stats.correct, stats.attempts, stats.studied, stats.total);
   const fields = fieldStats();
   const r = 52, circ = 2 * Math.PI * r;
   const offset = circ * (1 - acc / 100);
@@ -1335,9 +1353,10 @@ function renderGradeCard() {
       </svg>
     </div>
     <div class="grade-side">
-      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);">
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
         <div><div class="num">${stats.total}</div><div class="lbl">総用語数</div></div>
         <div><div class="num">${stats.studied}</div><div class="lbl">学習済み</div></div>
+        <div><div class="num">${coverage}%</div><div class="lbl">網羅率</div></div>
       </div>
       ${fieldRows}
     </div>
@@ -1727,6 +1746,7 @@ function renderResult() {
   }).join('') : '<div class="empty">全問正解です！</div>';
 
   return `
+  <div class="view-fill">
   <h1>結果</h1>
   <div class="card">
     <div class="stat-grid">
@@ -1741,6 +1761,7 @@ function renderResult() {
   </div>
   <div class="btn-row"><button class="btn secondary" id="retry-btn">同条件でもう一度</button></div>
   <div class="btn-row"><button class="btn ghost" id="home-btn">ホームに戻る</button></div>
+  </div>
   `;
 }
 
@@ -2202,6 +2223,7 @@ function renderShootingHUD() {
 
 function shootingSkeletonHTML() {
   return `
+  <div class="view-fill">
   <div id="sg-fever-banner" class="fever-banner" style="display:none;">🔥 FEVER TIME 🔥 スコア&amp;XP 1.6倍！</div>
   <div id="sg-emergency-banner" class="emergency-banner" style="display:none;">⚠ EMERGENCY ⚠ 正答率が低下しています</div>
   <div class="game-hud-top">
@@ -2219,6 +2241,7 @@ function shootingSkeletonHTML() {
   <div class="btn-row">
     <button class="btn ghost" id="sg-quit-btn">中断してホームへ</button>
     <button class="btn" id="sg-next-btn" style="display:none;">次へ</button>
+  </div>
   </div>
   `;
 }
@@ -2614,6 +2637,7 @@ function renderShootingResult() {
     : 'MISSION CLEAR';
   const isNewRecord = SG.dopa && SG.bestCombo > 0 && SG.bestCombo >= (ship.bestComboEver || 0);
   return `
+  <div class="view-fill">
   <h1 ${SG.dopa ? 'class="arcade-title" style="font-size:1.4rem;"' : ''}>${title}</h1>
   <div class="card">
     <div class="stat-grid">
@@ -2634,6 +2658,7 @@ function renderShootingResult() {
   </div>
   <div class="btn-row"><button class="btn secondary" id="sg-retry-btn">同条件でもう一度出撃</button></div>
   <div class="btn-row"><button class="btn ghost" id="sg-home-btn">ホームに戻る</button></div>
+  </div>
   `;
 }
 
