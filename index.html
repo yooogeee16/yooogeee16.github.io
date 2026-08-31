@@ -582,6 +582,20 @@ button.btn.danger {
 }
 .featured-term-body { flex: 1; min-width: 0; }
 .featured-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.featured-head-right { display: flex; align-items: center; gap: 10px; }
+.featured-refresh {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.5s ease;
+}
+.featured-refresh.spin { transform: rotate(360deg); }
 .featured-dots { display: flex; gap: 5px; }
 .featured-dots .dot {
   display: inline-block;
@@ -1552,10 +1566,13 @@ function renderFeaturedTerms() {
   }).join('');
   const dots = picked.map((_, n) => `<span class="dot${n === 0 ? ' active' : ''}" data-dot="${n}"></span>`).join('');
   return `
-  <div class="card">
+  <div class="card" id="featured-card">
     <div class="featured-head">
       <label class="field" style="margin:0;">収録用語の一例</label>
-      <div class="featured-dots" id="featured-dots">${dots}</div>
+      <div class="featured-head-right">
+        <div class="featured-dots" id="featured-dots">${dots}</div>
+        <button class="featured-refresh" id="featured-refresh" type="button" aria-label="別の用語に更新">🔄</button>
+      </div>
     </div>
     <div class="featured-viewport" id="featured-viewport">
       <div class="featured-track" id="featured-track" style="width:${picked.length * 100}%;">${slides}</div>
@@ -1587,6 +1604,12 @@ function initFeaturedCarousel() {
   if (prevBtn) prevBtn.addEventListener('click', () => { sfxClick(); goTo(index - 1); });
   if (nextBtn) nextBtn.addEventListener('click', () => { sfxClick(); goTo(index + 1); });
   dots.forEach((d, di) => d.addEventListener('click', () => { sfxClick(); goTo(di); }));
+  const refreshBtn = document.getElementById('featured-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => {
+    sfxClick();
+    refreshBtn.classList.add('spin');
+    setTimeout(() => refreshFeaturedCarousel(), 220);
+  });
 
   let startX = null, startY = null;
   viewport.addEventListener('touchstart', e => {
@@ -1603,6 +1626,21 @@ function initFeaturedCarousel() {
       goTo(index + (dx < 0 ? 1 : -1));
     }
   }, { passive: true });
+}
+
+// Swaps in a freshly-picked random set of terms (renderFeaturedTerms picks a
+// new random sample every call) and re-wires the new elements from scratch,
+// rather than patching the existing DOM in place -- avoids double-binding
+// event listeners on reused nodes.
+function refreshFeaturedCarousel() {
+  const card = document.getElementById('featured-card');
+  if (!card || !card.parentElement) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = renderFeaturedTerms().trim();
+  const newCard = wrap.firstElementChild;
+  if (!newCard) return;
+  card.replaceWith(newCard);
+  initFeaturedCarousel();
 }
 
 function renderHome() {
