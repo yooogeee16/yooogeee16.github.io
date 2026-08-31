@@ -298,6 +298,17 @@ body {
 .ios-step-num { font-weight: 800; font-size: 1.1rem; }
 .ios-step-text { font-size: 0.88rem; line-height: 1.5; }
 .ios-step-text strong { color: var(--accent); }
+.ios-safari-note {
+  font-size: 0.78rem !important;
+  line-height: 1.6 !important;
+  color: var(--gold) !important;
+  background: var(--gold-bg);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 12px !important;
+}
+.ios-safari-note strong { color: var(--gold); }
 #app {
   width: 100%;
   max-width: 720px;
@@ -718,6 +729,7 @@ button.btn.danger {
   <div class="legal-card">
     <h2>📲 ホーム画面に追加</h2>
     <p>このアプリをホーム画面に追加すると、アイコンをタップするだけですぐに開けます。</p>
+    <p class="ios-safari-note">⚠️ この手順は<strong>Safari</strong>でこのページを開いている場合のみ使えます。LINEやX（Twitter）、Instagramなどのアプリ内ブラウザで開いている場合は、メニューから「Safariで開く」を選んでから、下の手順を行ってください。</p>
     <div class="ios-step">
       <div class="ios-step-icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg></div>
       <div class="ios-step-text">画面下の<strong>共有ボタン</strong>をタップ</div>
